@@ -171,6 +171,8 @@ def main(folder, device, batch_size, epochs=2, learning_rate = 0.001):
             # wrap them in a torch Variable
             images, labels = Variable(images), Variable(labels)  
             
+            if device.type=="npu":
+                labels = labels.to(torch.int32)
             images = images.to(device)
             labels = labels.to(device)
             
