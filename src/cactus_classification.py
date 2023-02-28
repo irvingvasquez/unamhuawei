@@ -69,8 +69,12 @@ def validation(model, testloader, criterion, device):
     for images, labels in testloader:
 
         # warp input images in a Variable wrapper
+
         images = Variable(images)
         images = images.to(device)
+
+        if device.type=="npu":
+                labels = labels.to(torch.int32)
         
         labels = Variable(labels)
         labels = labels.to(device)
