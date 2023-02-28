@@ -62,7 +62,30 @@ class LeNet5(nn.Module):
         return F.log_softmax(x, dim=1)
 
 
-def main(folder, batch_size):
+# Implementamos una función de evaluación
+def validation(model, testloader, criterion):
+    test_loss = 0
+    accuracy = 0
+    for images, labels in testloader:
+
+        # warp input images in a Variable wrapper
+        images = Variable(images)
+        #images = images.to(device)
+        
+        labels = Variable(labels)
+        #labels = labels.to(device)
+        
+        output = model.forward(images)
+        
+        test_loss += criterion(output, labels).item()
+        
+        ps = torch.exp(output)
+        equality = (labels.data == ps.max(dim=1)[1])
+        accuracy += equality.type(torch.FloatTensor).mean()
+
+    return test_loss, accuracy
+
+def main(folder, batch_size, epochs=2, learning_rate = 0.001):
     # directorio de la carpeta donde esta el dataset
     directorio = 'cactus_dataset2'
     directorio = folder
@@ -115,6 +138,94 @@ def main(folder, batch_size):
     #model.to(device)
     print(model)
 
+    # define the criterion and optimizer
+    criterion = nn.NLLLoss()
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+    # Cliclo principal de entrenamiento por épocas
+
+    steps = 0
+    running_loss = 0
+    print_every = 40
+    save_after = 100
+
+    history_epoch = []
+    history_train_loss = []
+    history_validation_loss = []
+    history_train_accuracy = []
+    history_validation_accuracy = []
+
+    import time
+    tic = time.clock()
+
+    for e in range(epochs):
+        # Cambiamos a modo entrenamiento
+        model.train()  
+        
+        for images, labels in trainloader:
+            steps += 1
+                
+            optimizer.zero_grad()
+            
+            # wrap them in a torch Variable
+            images, labels = Variable(images), Variable(labels)  
+            
+            #images = images.to(device)
+            #labels = labels.to(device)
+            
+            output = model(images)
+            loss = criterion(output, labels)
+            # Backpropagation
+            loss.backward()
+            # Optimización
+            optimizer.step()
+            
+            running_loss += loss.item()
+        
+        # Cambiamos a modo de evaluación
+        model.eval()
+        
+        # Apagamos los gradientes, reduce memoria y cálculos
+        with torch.no_grad():
+            train_loss, train_accuracy = validation(model, trainloader, criterion)
+            val_loss, val_accuracy = validation(model, testloader, criterion)
+            
+            train_loss, train_accuracy = train_loss, train_accuracy.cpu().numpy()
+            val_loss, val_accuracy = val_loss, val_accuracy.cpu().numpy()
+            
+            train_accuracy = train_accuracy / len(trainloader)
+            val_accuracy = val_accuracy / len(testloader)
+            
+            print("Epoch: {}/{}.. ".format(e+1, epochs),
+                "Training Loss: {:.3f}.. ".format(train_loss),
+                "Val. Loss: {:.3f}.. ".format(val_loss),
+                "Train Accuracy: {:.3f}".format(train_accuracy),
+                "Val. Accuracy: {:.3f}".format(val_accuracy))
+        
+        # guardamos parametros estadisticos
+        history_epoch.append(e)
+        history_train_loss.append(train_loss)
+        history_validation_loss.append(val_loss)
+        history_train_accuracy.append(train_accuracy)
+        history_validation_accuracy.append(val_accuracy)
+        
+        # reseteamos la perdida actual
+        running_loss = 0
+        
+        # gardamos parametros estadisticos
+        if(e % save_after == 0):
+            np.save('log/train_loss', history_train_loss)
+            np.save('log/validation_loss', history_validation_loss)
+            np.save('log/train_accuracy', history_train_accuracy)
+            np.save('log/validation_accuracy', history_validation_accuracy)
+            torch.save(model.state_dict(), 'log/weights.pth')
+        
+        # regresamos el grafo de la red a modo entrenamiento
+        model.train()
+
+    # calculamos el tiempo que tomo el entrenamiento
+    toc = time.clock()
+    print(toc - tic)
 
 
 if __name__ == "__main__":
