@@ -63,17 +63,17 @@ class LeNet5(nn.Module):
 
 
 # Implementamos una función de evaluación
-def validation(model, testloader, criterion):
+def validation(model, testloader, criterion, device):
     test_loss = 0
     accuracy = 0
     for images, labels in testloader:
 
         # warp input images in a Variable wrapper
         images = Variable(images)
-        #images = images.to(device)
+        images = images.to(device)
         
         labels = Variable(labels)
-        #labels = labels.to(device)
+        labels = labels.to(device)
         
         output = model.forward(images)
         
@@ -85,7 +85,8 @@ def validation(model, testloader, criterion):
 
     return test_loss, accuracy
 
-def main(folder, batch_size, epochs=2, learning_rate = 0.001):
+
+def main(folder, device, batch_size, epochs=2, learning_rate = 0.001):
     # directorio de la carpeta donde esta el dataset
     directorio = 'cactus_dataset2'
     directorio = folder
@@ -135,7 +136,7 @@ def main(folder, batch_size, epochs=2, learning_rate = 0.001):
     classes = ['cactus', 'no_cactus']
 
     model = LeNet5(10)
-    #model.to(device)
+    model.to(device)
     print(model)
 
     # define the criterion and optimizer
@@ -170,8 +171,8 @@ def main(folder, batch_size, epochs=2, learning_rate = 0.001):
             # wrap them in a torch Variable
             images, labels = Variable(images), Variable(labels)  
             
-            #images = images.to(device)
-            #labels = labels.to(device)
+            images = images.to(device)
+            labels = labels.to(device)
             
             output = model(images)
             loss = criterion(output, labels)
@@ -187,8 +188,8 @@ def main(folder, batch_size, epochs=2, learning_rate = 0.001):
         
         # Apagamos los gradientes, reduce memoria y cálculos
         with torch.no_grad():
-            train_loss, train_accuracy = validation(model, trainloader, criterion)
-            val_loss, val_accuracy = validation(model, testloader, criterion)
+            train_loss, train_accuracy = validation(model, trainloader, criterion, device)
+            val_loss, val_accuracy = validation(model, testloader, criterion, device)
             
             train_loss, train_accuracy = train_loss, train_accuracy.cpu().numpy()
             val_loss, val_accuracy = val_loss, val_accuracy.cpu().numpy()
@@ -232,10 +233,16 @@ if __name__ == "__main__":
    argParser = argparse.ArgumentParser()
    argParser.add_argument("-f", "--folder", help="folder where dataset is")
 
+   argParser.add_argument('--no-cuda', action='store_true', default=False,
+                        help='disables CUDA training')
+
    args = argParser.parse_args()
+
+   use_cuda = not args.no_cuda and torch.npu.is_available()
+   device = torch.device("npu:0" if use_cuda else "cpu")
 
    folder = args.folder
 
    batch_size = 10
 
-   main(folder, batch_size=batch_size)
+   main(folder, device, batch_size=batch_size)
