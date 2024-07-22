@@ -255,4 +255,8 @@ if __name__ == "__main__":
 
    batch_size = 20
 
+   # Check if the folder log exists, if not then create it
+   if not os.path.exists('log'):
+        os.makedirs('log')
+
    main(folder, device, batch_size=batch_size)
