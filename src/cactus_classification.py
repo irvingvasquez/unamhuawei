@@ -1,5 +1,5 @@
 '''
-Exploratory data analisys for cactus classification
+Train LeNet5 on Cactus dataset
 @juan1rving
 '''
 
@@ -57,9 +57,8 @@ class LeNet5(nn.Module):
         # capas lineales
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        
-        return F.log_softmax(x, dim=1)
+        x = torch.sigmoid(self.fc3(x))
+        return F.softmax(x, dim=1)
 
 
 # Implementamos una función de evaluación
@@ -67,7 +66,6 @@ def validation(model, testloader, criterion, device):
     test_loss = 0
     accuracy = 0
     for images, labels in testloader:
-
         # warp input images in a Variable wrapper
 
         images = Variable(images)
@@ -80,7 +78,7 @@ def validation(model, testloader, criterion, device):
         labels = labels.to(device)
         
         output = model.forward(images)
-        
+
         test_loss += criterion(output, labels).item()
         
         ps = torch.exp(output)
@@ -95,6 +93,8 @@ def main(folder, device, batch_size, epochs=2, learning_rate = 0.001):
     directorio = 'cactus_dataset2'
     directorio = folder
 
+    print("Training on: ", directorio)
+
     # Conjunto de entrenamiento
 
     # aplicaré una serie de transformaciones
@@ -105,8 +105,8 @@ def main(folder, device, batch_size, epochs=2, learning_rate = 0.001):
     # 4. Espejo vertical con probabilidad igual a p
     # 5. convertir a tensores
     # 6. Normalizar
-    transformaciones_training = transforms.Compose([transforms.Resize(32),
-                                transforms.CenterCrop(32),
+    transformaciones_training = transforms.Compose([transforms.Resize((32, 32)),
+                                #transforms.CenterCrop(32),
                                 transforms.RandomHorizontalFlip(p=0.5),
                                 transforms.RandomVerticalFlip(p=0.5),
                                 transforms.ToTensor(),
@@ -114,20 +114,24 @@ def main(folder, device, batch_size, epochs=2, learning_rate = 0.001):
                                 ])
 
     # crear el objeto cargador de datos
-    trainset = datasets.ImageFolder(directorio + '/training_set', transformaciones_training) 
+    train_path = os.path.join(directorio, 'training_set')
+    trainset = datasets.ImageFolder(train_path, transformaciones_training) 
+    n_clases = len(trainset.classes)
+    print("Number of classes: ", n_clases)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size, shuffle=True)
 
     # Conjunto de validacíon
     # aplicaré una serie de transformaciones
     # 1. escalar las imágenes a 32 x 32 pixeles
     # 2. convertir a tensores
-    transformaciones_validacion = transforms.Compose([transforms.Resize(32),
-                                transforms.CenterCrop(32),
+    transformaciones_validacion = transforms.Compose([transforms.Resize((32, 32)),
+                                #transforms.CenterCrop(32),
                                 transforms.ToTensor(), 
                                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
 
-    testset = datasets.ImageFolder(directorio + '/validation_set', transform=transformaciones_validacion)
+    test_path = os.path.join(directorio, 'validation_set')
+    testset = datasets.ImageFolder(test_path, transform=transformaciones_validacion)
     testloader = torch.utils.data.DataLoader(testset, batch_size, shuffle=True)
 
     # Mostrar algunas características de los conjuntos de datos
@@ -139,15 +143,15 @@ def main(folder, device, batch_size, epochs=2, learning_rate = 0.001):
     # specify the image classes
     classes = ['cactus', 'no_cactus']
 
-    model = LeNet5(10)
+    model = LeNet5(2)
     model.to(device)
     print(model)
 
     # define the criterion and optimizer
-    criterion = nn.NLLLoss()
+    criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-    # Cliclo principal de entrenamiento por épocas
+    # Ciclo principal de entrenamiento por épocas
 
     steps = 0
     running_loss = 0
@@ -160,8 +164,7 @@ def main(folder, device, batch_size, epochs=2, learning_rate = 0.001):
     history_train_accuracy = []
     history_validation_accuracy = []
 
-    import time
-    tic = time.clock()
+    print("Starting training")
 
     for e in range(epochs):
         # Cambiamos a modo entrenamiento
@@ -221,18 +224,16 @@ def main(folder, device, batch_size, epochs=2, learning_rate = 0.001):
         
         # gardamos parametros estadisticos
         if(e % save_after == 0):
-            np.save('log/train_loss', history_train_loss)
-            np.save('log/validation_loss', history_validation_loss)
-            np.save('log/train_accuracy', history_train_accuracy)
-            np.save('log/validation_accuracy', history_validation_accuracy)
-            torch.save(model.state_dict(), 'log/weights.pth')
+            np.save(os.path.join('log', 'train_loss.npy'), history_train_loss)
+            np.save(os.path.join('log', 'validation_loss'), history_validation_loss)
+            np.save(os.path.join('log', 'train_accuracy'), history_train_accuracy)
+            np.save(os.path.join('log', 'validation_accuracy'), history_validation_accuracy)
+            torch.save(model.state_dict(), os.path.join('log', 'weights.pth'))
         
         # regresamos el grafo de la red a modo entrenamiento
         model.train()
 
-    # calculamos el tiempo que tomo el entrenamiento
-    toc = time.clock()
-    print(toc - tic)
+
 
 
 if __name__ == "__main__":
@@ -244,11 +245,14 @@ if __name__ == "__main__":
 
    args = argParser.parse_args()
 
+   print("This program implements a LeNet5 model to classify cactus images.\n")
+
    use_cuda = not args.no_cuda and torch.npu.is_available()
    device = torch.device("npu:0" if use_cuda else "cpu")
+   print("Using device: ", device)
 
    folder = args.folder
 
-   batch_size = 10
+   batch_size = 20
 
    main(folder, device, batch_size=batch_size)
